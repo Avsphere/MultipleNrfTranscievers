@@ -39,7 +39,7 @@ void setup() {
   // Open a writing and reading pipe on each radio, with opposite addresses
   if(radioNumber == 0){
   
-    radio.openWritingPipe(addresses[2]);
+    radio.openWritingPipe(addresses[random(1,5)]);
     radio.openReadingPipe(1,addresses[0]);
 
   }
@@ -58,6 +58,10 @@ void setup() {
     Serial.println("I am radio number 3");
     radio.openWritingPipe(addresses[0]);
     radio.openReadingPipe(1,addresses[3]);
+  } else if (radioNumber == 4){
+     Serial.println("I am radio number 4");
+     radio.openWritingPipe(addresses[0]);
+     radio.openReadingPipe(1,addresses[4]); 
   }
   
   myData.value = 1.22;
