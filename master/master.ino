@@ -1,14 +1,14 @@
 /*
-General Peasant code. Recieves a signal from the master then sends something back.
+This is the general code for the master. Make sure its radio number is 0.
+Currently is just randomly sends our datastructure to a random other radio.
 */
 
 #include <SPI.h>
 #include "RF24.h"
 
 byte addresses[][6] = {"1Node","2Node","3Node","4Node", "5Node"};
-/****************** User Config ***************************/
-/***      Set this radio as radio number 0 or 1         ***/
-int radioNumber = 3;
+//This is the master so leave at 0
+int radioNumber = 0;
 
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
 RF24 radio(7,8);
@@ -17,50 +17,19 @@ RF24 radio(7,8);
 
 // Used to control whether this node is sending or receiving
 bool role = 0;
-bool active = false;
 
+//What we are sending
 struct dataStruct{
   unsigned long _micros;
   float value;
-  int myRadio = 3;
+  int myRadio = 0;
 }myData;
-
-//the time we give the sensor to calibrate (10-60 secs according to the datasheet)
-int calibrationTime = 10;       
- 
-//the time when the sensor outputs a low impulse
-long unsigned int lowIn;        
- 
-//the amount of milliseconds the sensor has to be low
-//before we assume all motion has stopped
-long unsigned int pause = 5000; 
- 
-boolean lockLow = true;
-boolean takeLowTime; 
- 
-int pirPin = 5;    //the digital pin connected to the PIR sensor's output
-int ledPin = 4;
-int state =0;
 
 void setup() {
 
   Serial.begin(115200);
   Serial.println(F("RF24/examples/GettingStarted_HandlingData"));
   Serial.println(F("*** PRESS 'T' to begin transmitting to the other node"));
-
-  pinMode(pirPin, INPUT);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(pirPin, LOW);
-
-  //give the sensor some time to calibrate
-  Serial.print("calibrating sensor ");
-    for(int i = 0; i < calibrationTime; i++){
-      Serial.print(".");
-      delay(1000);
-      }
-  Serial.println(" done");
-  Serial.println("SENSOR ACTIVE");
-  delay(50);
   
   radio.begin();
 
@@ -71,9 +40,8 @@ void setup() {
   // Open a writing and reading pipe on each radio, with opposite addresses
   if(radioNumber == 0){
   
-    radio.openWritingPipe(addresses[random(1,5)]);
+    radio.openWritingPipe(addresses[random(1,4)]);
     radio.openReadingPipe(1,addresses[0]);
-
   }
   else if(radioNumber == 1){
    Serial.print("I am radio 1");
@@ -84,13 +52,13 @@ void setup() {
     Serial.println("I am radio number 2");
     radio.openWritingPipe(addresses[0]);
     radio.openReadingPipe(1,addresses[2]);
-    
   }
   else if (radioNumber == 3){
-    Serial.println("I am radio number 3");
+    Serial.println("I am radio number 2");
     radio.openWritingPipe(addresses[0]);
     radio.openReadingPipe(1,addresses[3]);
-  } else if (radioNumber == 4){
+  }
+  else if (radioNumber == 4){
      Serial.println("I am radio number 4");
      radio.openWritingPipe(addresses[0]);
      radio.openReadingPipe(1,addresses[4]); 
@@ -126,7 +94,7 @@ if (role == 1)  {
     boolean timeout = false;                                   // Set up a variable to indicate if a response was received or not
     
     while ( ! radio.available() ){                             // While nothing is received
-      if (micros() - started_waiting_at > 200000 ){            // If waited longer than 200ms, indicate timeout and exit while loop
+      if (micros() - started_waiting_at > 2000000 ){          // If waited longer than 200ms, indicate timeout and exit while loop
           timeout = true;
           break;
       }      
@@ -135,7 +103,7 @@ if (role == 1)  {
     if ( timeout ){                                             // Describe the results
         Serial.println(F("Failed, response timed out."));
     }else{
-                                                                // Grab the response, compare, and send to debugging spew
+                                 // Grab the response, compare, and send to debugging spew
         radio.read( &myData, sizeof(myData) );
         unsigned long time = micros();
         
@@ -148,6 +116,22 @@ if (role == 1)  {
         Serial.print(time-myData._micros);
         Serial.print(F(" microseconds Value "));
         Serial.println(myData.value);
+        Serial.print("This is from radio : ");
+        Serial.println(myData.myRadio);
+        
+        //Opens a writing pipe to a random peasant radio.
+        if(myData.myRadio == 1){
+           radio.openWritingPipe(addresses[2]);
+        }
+        if(myData.myRadio == 2){
+          radio.openWritingPipe(addresses[3]);
+        }
+        if(myData.myRadio == 3){
+          radio.openWritingPipe(addresses[4]);
+        }
+        if(myData.myRadio == 4){
+          radio.openWritingPipe(addresses[1]);
+        }
     }
 
     // Try again 1s later
@@ -166,31 +150,16 @@ if (role == 1)  {
       while (radio.available()) {                          // While there is data ready
         radio.read( &myData, sizeof(myData) );             // Get the payload
       }
-      
-      myData.myRadio = radioNumber;
+     
       radio.stopListening();                               // First, stop listening so we can talk  
       myData.value += 0.01;                                // Increment the float value
-      active = true;
-
-      digitalWrite(ledPin, HIGH);                          //Turn on LED                         
-      
-      while(active){
-        state = digitalRead(pirPin);
-        delay(20);                                            //debouncing?!
-        if(state == 1){
-          Serial.println("Motion motion motion!!");
-          radio.write( &myData, sizeof(myData) );              // Send the final one back.      
-          radio.startListening();                              // Now, resume listening so we catch the next packets.     
-          Serial.print(F("Sent response "));
-          Serial.print(myData._micros);  
-          Serial.print(F(" : "));
-          Serial.println(myData.value);
-          active = false;
-      }
+      radio.write( &myData, sizeof(myData) );              // Send the final one back.      
+      radio.startListening();                              // Now, resume listening so we catch the next packets.     
+      Serial.print(F("Sent response "));
+      Serial.print(myData._micros);  
+      Serial.print(F(" : "));
+      Serial.println(myData.value);
    }
-
-      digitalWrite(ledPin, LOW);
-    }
  }
 
 
@@ -211,7 +180,6 @@ if (role == 1)  {
        role = 0;                // Become the primary receiver (pong back)
        radio.startListening();
     }
-   
   }
 
 

@@ -6,7 +6,7 @@ Currently is just randomly sends our datastructure to a random other radio.
 #include <SPI.h>
 #include "RF24.h"
 
-byte addresses[][6] = {"1Node","2Node","3Node","4Node"};
+byte addresses[][6] = {"1Node","2Node","3Node","4Node", "5Node"};
 //This is the master so leave at 0
 int radioNumber = 0;
 
@@ -40,7 +40,7 @@ void setup() {
   // Open a writing and reading pipe on each radio, with opposite addresses
   if(radioNumber == 0){
   
-    radio.openWritingPipe(addresses[2]);
+    radio.openWritingPipe(addresses[random(1,4)]);
     radio.openReadingPipe(1,addresses[0]);
   }
   else if(radioNumber == 1){
@@ -58,6 +58,11 @@ void setup() {
     radio.openWritingPipe(addresses[0]);
     radio.openReadingPipe(1,addresses[3]);
   }
+  else if (radioNumber == 4){
+     Serial.println("I am radio number 4");
+     radio.openWritingPipe(addresses[0]);
+     radio.openReadingPipe(1,addresses[4]); 
+  }
   
   myData.value = 1.22;
   // Start the radio listening for data
@@ -70,7 +75,7 @@ void setup() {
 void loop() {
   
   
-/****************** Master Send ***************************/  
+/****************** Ping Out Role ***************************/  
 if (role == 1)  {
     
     radio.stopListening();                                    // First, stop listening so we can talk.
@@ -88,21 +93,18 @@ if (role == 1)  {
     unsigned long started_waiting_at = micros();               // Set up a timeout period, get the current microseconds
     boolean timeout = false;                                   // Set up a variable to indicate if a response was received or not
     
-//    while ( ! radio.available() ){                             // While nothing is received
-//      if (micros() - started_waiting_at > 200000 ){            // If waited longer than 200ms, indicate timeout and exit while loop
-//          timeout = true;
-//          break;
-//      }      
-//    }
+    while ( ! radio.available() ){                             // While nothing is received
+      if (micros() - started_waiting_at > 2000000 ){          // If waited longer than 200ms, indicate timeout and exit while loop
+          timeout = true;
+          break;
+      }      
+    }
         
     if ( timeout ){                                             // Describe the results
         Serial.println(F("Failed, response timed out."));
     }else{
                                  // Grab the response, compare, and send to debugging spew
-       
-        //This is where the master reads from the peasant.
         radio.read( &myData, sizeof(myData) );
-        
         unsigned long time = micros();
         
         // Spew it
@@ -118,14 +120,15 @@ if (role == 1)  {
         Serial.println(myData.myRadio);
         
         //Opens a writing pipe to a random peasant radio.
-        radio.openWritingPipe(addresses[random(1,4)]);
-        
-        //A pipe was opened to a random radio. This radio will need to send something back before the master sends again.
-        
-        
-        
-        
-
+        if(myData.myRadio == 1){
+           radio.openWritingPipe(addresses[2]);
+        }
+        if(myData.myRadio == 2){
+          radio.openWritingPipe(addresses[3]);
+        }
+        if(myData.myRadio == 3){
+          radio.openWritingPipe(addresses[1]);
+        }
     }
 
     // Try again 1s later
