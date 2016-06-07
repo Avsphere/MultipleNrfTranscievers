@@ -1,13 +1,15 @@
 /*
-This is the general code for the master. Make sure its radio number is 0.
-Currently is just randomly sends our datastructure to a random other radio.
+This is the general code for the master. 
 */
 
 #include <SPI.h>
 #include "RF24.h"
 
+
+//All of the nodes that we are using.
 byte addresses[][6] = {"1Node","2Node","3Node","4Node", "5Node"};
-//This is the master so leave at 0
+
+//MASTER is 0
 int radioNumber = 0;
 
 /* Hardware configuration: Set up nRF24L01 radio on SPI bus plus pins 7 & 8 */
@@ -28,43 +30,20 @@ struct dataStruct{
 void setup() {
 
   Serial.begin(115200);
-  Serial.println(F("RF24/examples/GettingStarted_HandlingData"));
-  Serial.println(F("*** PRESS 'T' to begin transmitting to the other node"));
+  Serial.println(F("Master Transciever."));
+  Serial.println(F("*** PRESS 'T' to begin ordering the peasants"));
   
   radio.begin();
-
-  // Set the PA Level low to prevent power supply related issues since this is a
- // getting_started sketch, and the likelihood of close proximity of the devices. RF24_PA_MAX is default.
-  radio.setPALevel(RF24_PA_LOW);
+  //Range Amplifiers
+  radio.setDataRate(RF24_250KBPS);
+  radio.setChannel(108); //Above most wifi channels
+  radio.setPALevel(RF24_PA_HIGH);
   
-  // Open a writing and reading pipe on each radio, with opposite addresses
-  if(radioNumber == 0){
+   //Starts on a random device 1, 2, or 3.
+   radio.openWritingPipe(addresses[random(1,4)]);
+   radio.openReadingPipe(1,addresses[0]);
   
-    radio.openWritingPipe(addresses[random(1,4)]);
-    radio.openReadingPipe(1,addresses[0]);
-  }
-  else if(radioNumber == 1){
-   Serial.print("I am radio 1");
-    radio.openWritingPipe(addresses[0]);
-    radio.openReadingPipe(1,addresses[1]);
-  }
-  else if (radioNumber == 2){
-    Serial.println("I am radio number 2");
-    radio.openWritingPipe(addresses[0]);
-    radio.openReadingPipe(1,addresses[2]);
-  }
-  else if (radioNumber == 3){
-    Serial.println("I am radio number 2");
-    radio.openWritingPipe(addresses[0]);
-    radio.openReadingPipe(1,addresses[3]);
-  }
-  else if (radioNumber == 4){
-     Serial.println("I am radio number 4");
-     radio.openWritingPipe(addresses[0]);
-     radio.openReadingPipe(1,addresses[4]); 
-  }
-  
-  myData.value = 1.22;
+  myData.value = 0;
   // Start the radio listening for data
   radio.startListening();
 }
@@ -75,17 +54,15 @@ void setup() {
 void loop() {
   
   
-/****************** Ping Out Role ***************************/  
+/****************** Transmission Role ***************************/  
 if (role == 1)  {
     
-    radio.stopListening();                                    // First, stop listening so we can talk.
-    
-    
+    radio.stopListening();                                    // First, stop listening so we can talk.  
     Serial.println(F("Now sending"));
 
     myData._micros = micros();
      if (!radio.write( &myData, sizeof(myData) )){
-       Serial.println(F("failed"));
+       Serial.println(F("failed")); //auto ack is on
      }
         
     radio.startListening();                                    // Now, continue listening
@@ -172,11 +149,6 @@ if (role == 1)  {
       role = 1;                  // Become the primary transmitter (ping out)
     
    }
-  else if ( c == 'R' && role == 1 ){
-      Serial.println(F("*** CHANGING TO RECEIVE ROLE -- PRESS 'T' TO SWITCH BACK"));      
-       role = 0;                // Become the primary receiver (pong back)
-       radio.startListening();
-    }
   }
 
 
